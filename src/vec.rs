@@ -27,6 +27,10 @@ impl NibVec {
         Self::from_pair_vec(unsafe { mem::transmute(inner) })
     }
 
+    pub fn to_byte_vec(&self) -> Vec<u8> {
+        unsafe { mem::transmute(self.inner.clone()) }
+    }
+
     /// Number of nibbles in the vector.
     pub fn len(&self) -> usize {
         (self.inner.len() >> 1).saturating_sub(!self.has_right_lo as usize)
