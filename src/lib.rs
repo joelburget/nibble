@@ -8,6 +8,8 @@
 extern crate arrayvec;
 extern crate core;
 extern crate num_traits;
+#[macro_use]
+extern crate quickcheck;
 
 mod cmp;
 mod common;

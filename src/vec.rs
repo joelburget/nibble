@@ -4,6 +4,7 @@ use base::{u4lo, u4};
 use pair::u4x2;
 use slice::{self, NibSliceAligned, NibSliceAlignedMut, NibSliceFull, NibSliceNoR};
 use common::{get_nib, set_nib, shift_left, shift_right};
+use quickcheck::{Arbitrary, Gen};
 
 /// A `Vec` of nibbles.
 #[derive(Clone)]
@@ -138,3 +139,58 @@ impl slice::private::SealedMut for NibVec {
 }
 impl slice::NibSliceExt for NibVec {}
 impl slice::NibSliceMutExt for NibVec {}
+
+unsafe impl Send for NibVec {}
+impl Arbitrary for NibVec {
+    fn arbitrary<G: Gen>(g: &mut G) -> NibVec {
+        let size = { let s = g.size(); g.gen_range(0, s) };
+        let mut ret = NibVec::new();
+        for _ in 0..size {
+            ret.push(u4lo::from_lo(u8::arbitrary(g)));
+        }
+        ret
+    }
+    // fn shrink(&self) -> Box<Iterator<Item=NibVec>> {
+    //     Box::new()
+    // }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn from_str_works() {
+        let result = NibVec::from_str("112").unwrap();
+        let mut expected = NibVec::new();
+        expected.push(u4lo::from_lo(1));
+        expected.push(u4lo::from_lo(1));
+        expected.push(u4lo::from_lo(2));
+        assert_eq!(result, expected);
+    }
+
+    quickcheck! {
+        fn nibble_add_len(n: u16) -> bool {
+            let mut nib = NibVec::new();
+            for i in 0..n {
+                nib.push(u4lo::from_lo(i as u8));
+            }
+            nib.len() == (n as usize)
+        }
+
+        /*
+        fn byte_vec_round_trip(nib_vec: NibVec) -> bool {
+            let byte_vec = nib_vec.to_byte_vec();
+            let nib_vec_2 = NibVec::from_byte_vec(byte_vec);
+            nib_vec == nib_vec_2
+        }
+        */
+
+        fn byte_vec_round_trip(byte_vec: Vec<u8>) -> bool {
+            let byte_vec_copy = byte_vec.clone();
+            let nib_vec = NibVec::from_byte_vec(byte_vec);
+            let byte_vec_2 = nib_vec.to_byte_vec();
+            byte_vec_copy == byte_vec_2
+        }
+    }
+}
