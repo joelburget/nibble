@@ -33,7 +33,7 @@ impl NibVec {
 
     /// Number of nibbles in the vector.
     pub fn len(&self) -> usize {
-        (self.inner.len() >> 1).saturating_sub(!self.has_right_lo as usize)
+        (self.inner.len() << 1).saturating_sub(!self.has_right_lo as usize)
     }
 
     /// Whether the vector is empty.
@@ -43,7 +43,7 @@ impl NibVec {
 
     /// How many nibbles can be stored in the vector.
     pub fn capacity(&self) -> usize {
-        self.inner.capacity() >> 1
+        self.inner.capacity() << 1
     }
 
     /// Pushes a nibble onto the vector.
@@ -52,13 +52,13 @@ impl NibVec {
     ///
     /// Panics if the vector is full.
     pub fn push<T: u4>(&mut self, nib: T) {
-        self.has_right_lo = !self.has_right_lo;
         if self.has_right_lo {
             self.inner.push(u4x2::from_hi(nib.to_u4hi()));
         } else {
             let i = self.inner.len() - 1;
             self.inner[i].set_lo(nib);
         }
+        self.has_right_lo = !self.has_right_lo;
     }
 
     /// Inserts a nibble into the vector at the given index.

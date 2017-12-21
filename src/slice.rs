@@ -71,7 +71,7 @@ pub trait NibSliceExt: private::Sealed {
     fn len(&self) -> usize {
         let hi = self.has_left_hi() as usize;
         let lo = self.has_right_lo() as usize;
-        self.iter().as_slice().len().saturating_sub(hi + lo)
+        (self.iter().as_slice().len() << 1).saturating_sub(hi + lo)
     }
 
     /// Checks if the slice is empty.
