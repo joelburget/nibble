@@ -89,7 +89,7 @@ impl NibVec {
     /// Removes a nibble from the vector, converting it to a high-order nibble.
     pub fn pop<T: u4>(&mut self) -> Option<T> {
         self.has_right_lo = !self.has_right_lo;
-        if self.has_right_lo {
+        if !self.has_right_lo {
             Some(T::from_lo(self.inner[self.inner.len() - 1].lo().to_lo()))
         } else {
             self.inner.pop().map(|pair| T::from_hi(pair.hi().to_hi()))
@@ -118,6 +118,33 @@ impl NibVec {
         } else {
             NibSliceAlignedMut::Odd(unsafe { &mut *(&mut self.inner[..] as *mut [u4x2] as *mut NibSliceNoR) })
         }
+    }
+
+    /// Copy all the elements of `other` into `Self`.
+    ///
+    /// # Panics
+    ///
+    /// Panics if the number of elements in the vector overflows a `usize`.
+    #[inline]
+    pub fn append(&mut self, other: &Self) {
+        use slice::private::Sealed;
+
+        self.reserve(other.len() / 2);
+        for nib in other.iter() {
+            self.push(*nib.hi());
+            self.push(*nib.lo());
+        }
+        if !other.has_right_lo() { self.pop::<u4lo>(); }
+    }
+
+    /// Reserves capacity for at least `additional` more elements to be inserted in the
+    /// `BinaryHeap`. The collection may reserve more space to avoid frequent reallocations.
+    ///
+    /// # Panics
+    ///
+    /// Panics if the new capacity overflows `usize`.
+    pub fn reserve(&mut self, additional: usize) {
+        self.inner.reserve(additional / 2);
     }
 }
 impl Default for NibVec {
@@ -158,6 +185,7 @@ impl Arbitrary for NibVec {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use quickcheck::TestResult;
 
     #[test]
     fn from_str_works() {
@@ -191,6 +219,38 @@ mod tests {
             let nib_vec = NibVec::from_byte_vec(byte_vec);
             let byte_vec_2 = nib_vec.to_byte_vec();
             byte_vec_copy == byte_vec_2
+        }
+
+        fn pop_decrements_length(vec: NibVec) -> TestResult {
+            let mut vec = vec.clone();
+            if vec.len() == 0 { return TestResult::discard(); }
+
+            let len_before = vec.len();
+            vec.pop::<u4lo>();
+            let len_after  = vec.len();
+
+            return TestResult::from_bool(len_after == len_before - 1);
+        }
+
+        fn vec_append_elems(vec1: NibVec, vec2: NibVec) -> bool {
+            let mut vec1_copy = vec1.clone();
+            let start = vec1.len();
+            vec1_copy.append(&vec2);
+            let mut okay = true;
+
+            for i in 0..vec1.len() {
+                okay = okay &&
+                    get_nib::<u4lo>(vec1_copy.inner.as_slice(), i) ==
+                    get_nib::<u4lo>(vec1.inner.as_slice(),      i);
+            }
+
+            for i in 0..vec2.len() {
+                okay = okay &&
+                    get_nib::<u4lo>(vec1_copy.inner.as_slice(), start + i) ==
+                    get_nib::<u4lo>(vec2.inner.as_slice(),              i);
+            }
+
+            okay
         }
     }
 }
