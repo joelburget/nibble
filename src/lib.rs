@@ -8,6 +8,7 @@
 extern crate arrayvec;
 extern crate core;
 extern crate num_traits;
+extern crate rand;
 #[macro_use]
 extern crate quickcheck;
 

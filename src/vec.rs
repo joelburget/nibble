@@ -129,7 +129,7 @@ impl NibVec {
     pub fn append(&mut self, other: &Self) {
         use slice::private::Sealed;
 
-        self.reserve(other.len() / 2);
+        self.reserve(other.len());
         for nib in other.iter() {
             self.push(*nib.hi());
             self.push(*nib.lo());
@@ -145,6 +145,16 @@ impl NibVec {
     /// Panics if the new capacity overflows `usize`.
     pub fn reserve(&mut self, additional: usize) {
         self.inner.reserve(additional / 2);
+    }
+
+    pub fn slice(&self, start: usize, end: usize) -> NibVec {
+        let mut ret = NibVec::new();
+        ret.reserve(end - start);
+        let slice = self.inner.as_slice();
+        for i in start..end {
+            ret.push(get_nib::<u4lo>(slice, i));
+        }
+        ret
     }
 }
 impl Default for NibVec {
@@ -186,6 +196,8 @@ impl Arbitrary for NibVec {
 mod tests {
     use super::*;
     use quickcheck::TestResult;
+    use rand::{thread_rng, Rng};
+    use std::cmp::{min, max};
 
     #[test]
     fn from_str_works() {
@@ -229,7 +241,7 @@ mod tests {
             vec.pop::<u4lo>();
             let len_after  = vec.len();
 
-            return TestResult::from_bool(len_after == len_before - 1);
+            TestResult::from_bool(len_after == len_before - 1)
         }
 
         fn vec_append_elems(vec1: NibVec, vec2: NibVec) -> bool {
@@ -238,19 +250,47 @@ mod tests {
             vec1_copy.append(&vec2);
             let mut okay = true;
 
+            let vec1_copy_slice = vec1_copy.inner.as_slice();
+            let vec1_slice      = vec1.inner.as_slice();
+            let vec2_slice      = vec2.inner.as_slice();
+
             for i in 0..vec1.len() {
                 okay = okay &&
-                    get_nib::<u4lo>(vec1_copy.inner.as_slice(), i) ==
-                    get_nib::<u4lo>(vec1.inner.as_slice(),      i);
+                    get_nib::<u4lo>(vec1_copy_slice, i) ==
+                    get_nib::<u4lo>(vec1_slice,      i);
             }
 
             for i in 0..vec2.len() {
                 okay = okay &&
-                    get_nib::<u4lo>(vec1_copy.inner.as_slice(), start + i) ==
-                    get_nib::<u4lo>(vec2.inner.as_slice(),              i);
+                    get_nib::<u4lo>(vec1_copy_slice, start + i) ==
+                    get_nib::<u4lo>(vec2_slice,              i);
             }
 
             okay
+        }
+
+        fn slice_gives_right_elems(vec: NibVec) -> TestResult {
+            if vec.len() == 0 { return TestResult::discard(); }
+
+            let mut rng = thread_rng();
+            let bound1: usize = rng.gen_range(0, vec.len());
+            let bound2: usize = rng.gen_range(0, vec.len());
+            let start = min(bound1, bound2);
+            let end = max(bound1, bound2);
+
+            let slice = vec.slice(start, end);
+
+            let vec_slice = vec.inner.as_slice();
+            let slice_slice = slice.inner.as_slice();
+
+            let mut okay = true;
+            for i in start..end {
+                okay = okay &&
+                    get_nib::<u4lo>(slice_slice, i - start) ==
+                    get_nib::<u4lo>(vec_slice,   i);
+            }
+
+            TestResult::from_bool(okay)
         }
     }
 }
